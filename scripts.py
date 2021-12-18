@@ -3,13 +3,29 @@ import random
 from datacenter.models import Schoolkid, Lesson, Mark, Chastisement, Commendation
 
 
+def get_child_from_schoolkid_model(schoolkid):
+    try:
+        return Schoolkid.objects.get(full_name__contains=schoolkid)
+    except Schoolkid.MultipleObjectsReturned:
+        raise Schoolkid.MultipleObjectsReturned(
+            'Введенное имя либо пустое, либо слишком распространенное. '
+            'Необходимо ввести полностью ФИО.'
+        )
+    except Schoolkid.DoesNotExist:
+        raise Schoolkid.DoesNotExist(
+            'Такого имени не существует в базе. '
+            'Проверьте правильность написания '
+            'и наличие такого ученика на сайте.'
+        )
+
+
 def fix_marks(schoolkid):
-    child = Schoolkid.objects.get(full_name__contains=schoolkid)
+    child = get_child_from_schoolkid_model(schoolkid)
     Mark.objects.filter(schoolkid=child, points__in=[2, 3]).update(points=5)
 
 
 def remove_chastisements(schoolkid):
-    child = Schoolkid.objects.get(full_name__contains=schoolkid)
+    child = get_child_from_schoolkid_model(schoolkid)
     Chastisement.objects.filter(schoolkid=child).delete()
 
 
@@ -49,12 +65,17 @@ def create_commendation(schoolkid, subject, commendation_text=None):
                 'Теперь у тебя точно все получится!',
             ]
         )
-    child = Schoolkid.objects.get(full_name__contains=schoolkid)
+    child = get_child_from_schoolkid_model(schoolkid)
     lesson = Lesson.objects.filter(
         year_of_study=child.year_of_study,
         group_letter=child.group_letter,
         subject__title=subject,
     ).order_by('-date').first()
+    if not lesson:
+        raise Lesson.DoesNotExist(
+            'Проверьте правильность написания предмета. '
+            'Сверьтесь с наличием предмета на сайте в расписании.'
+        )
     Commendation.objects.create(
         text=commendation_text,
         created=lesson.date,
